@@ -1,0 +1,60 @@
+name: Build & Publish APT (aptly + Pages)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'pkgs/**'            # khi bạn thêm/cập nhật .deb sẽ tự chạy
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptly gnupg dpkg-dev
+
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --yes --import
+          echo "KEYID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5; exit}')" >> $GITHUB_ENV
+
+      - name: Collect packages
+        run: |
+          mkdir -p artifacts
+          cp pkgs/*.deb artifacts/ || true
+          test -n "$(ls -A artifacts 2>/dev/null)" || { echo "No .deb found in pkgs/"; exit 1; }
+
+      - name: Create & publish APT repo with aptly
+        run: |
+          rm -rf site
+          mkdir -p site
+          # repo tên 'kivotos', distro trixie, component main (bạn có thể đổi)
+          aptly repo create -distribution=trixie -component=main kivotos
+          aptly repo add kivotos artifacts/*.deb
+          aptly publish repo -architectures=amd64 -gpg-key="${KEYID}" kivotos filesystem:site:
+          # thêm public key & .nojekyll
+          gpg --armor --export "${KEYID}" > site/pubkey.gpg
+          touch site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-22.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
