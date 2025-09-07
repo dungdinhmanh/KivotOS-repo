@@ -31,6 +31,22 @@ jobs:
           mkdir -p artifacts
           cp pkgs/*.deb artifacts/ || true
           test -n "$(ls -A artifacts 2>/dev/null)" || { echo "No .deb found in pkgs/"; exit 1; }
+      - name: Configure aptly filesystem endpoint
+        run: |
+          mkdir -p site
+          cat > ~/.aptly.conf <<'JSON'
+          {
+            "rootDir": ".aptly",
+            "downloadConcurrency": 4,
+            "ppaDistributorSkipArchiveCleanup": true,
+            "FileSystemPublishEndpoints": {
+              "site": {
+                "rootDir": "site",
+                "linkMethod": "copy"   // or "hardlink" if you prefer
+              }
+            }
+          }
+          JSON
 
       - name: Create & publish APT repo with aptly
         run: |
