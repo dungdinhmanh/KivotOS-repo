@@ -1,9 +1,10 @@
 name: Build & Publish APT (aptly + Pages)
+
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'pkgs/**'            # khi bạn thêm/cập nhật .deb sẽ tự chạy
+      - 'pkgs/**'
 
 permissions:
   contents: read
@@ -21,9 +22,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y aptly gnupg dpkg-dev
 
-      - name: Import GPG key
+      - name: Import GPG & enable loopback
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --yes --import
+          mkdir -p ~/.gnupg
+          echo 'allow-loopback-pinentry' > ~/.gnupg/gpg-agent.conf
+          echo 'pinentry-mode loopback'  > ~/.gnupg/gpg.conf
+          gpgconf --reload gpg-agent
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
           echo "KEYID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5; exit}')" >> $GITHUB_ENV
 
       - name: Collect packages
@@ -31,6 +38,7 @@ jobs:
           mkdir -p artifacts
           cp pkgs/*.deb artifacts/ || true
           test -n "$(ls -A artifacts 2>/dev/null)" || { echo "No .deb found in pkgs/"; exit 1; }
+
       - name: Configure aptly filesystem endpoint
         run: |
           mkdir -p site
@@ -40,23 +48,21 @@ jobs:
             "downloadConcurrency": 4,
             "ppaDistributorSkipArchiveCleanup": true,
             "FileSystemPublishEndpoints": {
-              "site": {
-                "rootDir": "site",
-                "linkMethod": "copy"
-              }
+              "site": { "rootDir": "site", "linkMethod": "copy" }
             }
           }
           JSON
 
       - name: Create & publish APT repo with aptly
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}  # để trống nếu key không có pass
         run: |
           rm -rf site
           mkdir -p site
-          # repo tên 'kivotos', distro trixie, component main (bạn có thể đổi)
-          aptly repo create -distribution=trixie -component=main kivotos
+          aptly repo create -distribution=trixie -component=main kivotos || true
           aptly repo add kivotos artifacts/*.deb
-          aptly publish repo -architectures=amd64 -gpg-key="${KEYID}" kivotos filesystem:site:
-          # thêm public key & .nojekyll
+          aptly publish repo -architectures=amd64 -gpg-key="${KEYID}" -passphrase="${GPG_PASSPHRASE}" \
+            kivotos filesystem:site:
           gpg --armor --export "${KEYID}" > site/pubkey.gpg
           touch site/.nojekyll
 
