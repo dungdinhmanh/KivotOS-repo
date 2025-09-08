@@ -1,7 +1,7 @@
 name: Auto Yazi → APT + Release
 
 on:
-  schedule: [{ cron: "15 3 * * *" }]     # quét mỗi ngày
+  schedule: [{ cron: "15 3 * * *" }]
   workflow_dispatch: {}
 
 permissions:
@@ -19,7 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Lấy tag mới nhất upstream
+      # jq để parse JSON từ GitHub API
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      # 1) Tag mới nhất upstream
       - name: Get latest upstream tag
         id: tag
         run: |
@@ -33,16 +39,17 @@ jobs:
         if: steps.tag.outputs.already_built == 'true'
         run: echo "No new tag."
 
+      # 2) Toolchain build
       - name: Install toolchain
         if: steps.tag.outputs.already_built != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq curl git build-essential dpkg-dev gnupg aptly
+          sudo apt-get install -y curl git build-essential dpkg-dev gnupg aptly equivs
           curl -fsSL https://sh.rustup.rs | sh -s -- -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           cargo install cargo-deb
 
-      # Build .deb
+      # 3) Build .deb
       - name: Build Yazi debs
         if: steps.tag.outputs.already_built != 'true'
         run: |
@@ -53,7 +60,27 @@ jobs:
           mkdir -p ../pkgs/yazi/${{ steps.tag.outputs.TAG }}
           cp target/debian/*.deb ../pkgs/yazi/${{ steps.tag.outputs.TAG }}/
 
-      # Commit & tag
+      # 4) Meta-package yazi (kéo yazi-fm + yazi-cli)
+      - name: Build meta-package yazi
+        if: steps.tag.outputs.already_built != 'true'
+        run: |
+          VER=$(dpkg-deb -f pkgs/yazi/${{ steps.tag.outputs.TAG }}/yazi-fm_*_amd64.deb Version)
+          cat > yazi-meta <<EOF
+Section: utils
+Priority: optional
+Standards-Version: 4.7.0
+
+Package: yazi
+Version: ${VER}
+Architecture: all
+Depends: yazi-fm (= ${VER}), yazi-cli (= ${VER})
+Description: Meta package to install Yazi TUI and ya CLI
+ This package pulls both yazi (TUI) and ya (CLI).
+EOF
+          equivs-build yazi-meta
+          cp yazi_${VER}_all.deb pkgs/yazi/${{ steps.tag.outputs.TAG }}/
+
+      # 5) Commit + tag
       - name: Commit debs & tag
         if: steps.tag.outputs.already_built != 'true'
         run: |
@@ -64,7 +91,7 @@ jobs:
           git tag -a "yazi-${{ steps.tag.outputs.TAG }}" -m "Yazi ${{ steps.tag.outputs.TAG }}"
           git push --follow-tags
 
-      # GPG & aptly config
+      # 6) GPG + aptly config
       - name: Setup GPG & aptly
         run: |
           mkdir -p ~/.gnupg
@@ -82,7 +109,7 @@ jobs:
           }
           JSON
 
-      # Publish toàn bộ pkgs/ vào APT repo + copy deb theo version lên Pages
+      # 7) Publish APT repo + copy .deb theo version lên Pages
       - name: Publish APT (aptly -> site/)
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -92,6 +119,8 @@ jobs:
           rm -rf site && mkdir -p site
           aptly repo create -distribution="${DISTRO}" -component="${COMPONENT}" kivotos || true
           find pkgs -name '*.deb' -print -exec aptly repo add kivotos {} \;
+          # drop bản publish cũ nếu có, rồi publish lại
+          aptly publish drop "${DISTRO}" filesystem:site: || true
           aptly publish repo \
             -architectures=amd64 \
             -gpg-key="${KEYID}" \
@@ -103,7 +132,7 @@ jobs:
           gpg --armor --export "${KEYID}" > site/pubkey.gpg
           touch site/.nojekyll
 
-
+      # 8) Deploy Pages
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with: { path: site }
@@ -111,7 +140,7 @@ jobs:
       - name: Deploy to Pages
         uses: actions/deploy-pages@v4
 
-      # Release kèm asset .deb
+      # 9) Release kèm asset
       - name: Create Release
         if: steps.tag.outputs.already_built != 'true'
         uses: softprops/action-gh-release@v2
