@@ -6,15 +6,15 @@ Supported: Debian trixie / amd64
 # Add the repo 
 ## 1) Import repo key
 ```bash
-  curl -fsSL https://apt.keqingcloud.com/pubkey.gpg \
-  | sudo gpg --dearmor -o /usr/share/keyrings/kivotos.gpg
+curl -fsSL https://apt.keqingcloud.com/pubkey.gpg \
+sudo gpg --dearmor -o /usr/share/keyrings/kivotos.gpg
 ```
 
 ## 2) Add sources list (trixie/main)
 ```bash
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/kivotos.gpg] \
 https://apt.keqingcloud.com trixie main" \
-| sudo tee /etc/apt/sources.list.d/kivotos.list
+sudo tee /etc/apt/sources.list.d/kivotos.list
 ```
 
 ## 3) Update & install
