@@ -83,19 +83,26 @@ jobs:
           JSON
 
       # Publish toàn bộ pkgs/ vào APT repo + copy deb theo version lên Pages
-      - name: Publish APT (aptly → site/)
-        env: { GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }} }
+      - name: Publish APT (aptly -> site/)
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        shell: bash
         run: |
+          set -euo pipefail
           rm -rf site && mkdir -p site
-          aptly repo create -distribution=${DISTRO} -component=${COMPONENT} kivotos || true
+          aptly repo create -distribution="${DISTRO}" -component="${COMPONENT}" kivotos || true
           find pkgs -name '*.deb' -print -exec aptly repo add kivotos {} \;
-          aptly publish repo -architectures=amd64 -gpg-key="${KEYID}" -passphrase="${GPG_PASSPHRASE}" \
-            -distribution=${DISTRO} kivotos filesystem:site:
-          # thư mục hiển thị theo phiên bản
-          mkdir -p site/yazi/${{ steps.tag.outputs.TAG }}
-          cp pkgs/yazi/${{ steps.tag.outputs.TAG }}/*.deb site/yazi/${{ steps.tag.outputs.TAG }}/ || true
+          aptly publish repo \
+            -architectures=amd64 \
+            -gpg-key="${KEYID}" \
+            -passphrase="${GPG_PASSPHRASE:-}" \
+            -distribution="${DISTRO}" \
+            kivotos filesystem:site:
+          mkdir -p "site/yazi/${{ steps.tag.outputs.TAG }}"
+          cp pkgs/yazi/${{ steps.tag.outputs.TAG }}/*.deb "site/yazi/${{ steps.tag.outputs.TAG }}/" || true
           gpg --armor --export "${KEYID}" > site/pubkey.gpg
           touch site/.nojekyll
+
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
