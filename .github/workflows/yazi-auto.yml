@@ -66,19 +66,19 @@ jobs:
         run: |
           VER=$(dpkg-deb -f pkgs/yazi/${{ steps.tag.outputs.TAG }}/yazi-fm_*_amd64.deb Version)
           cat > yazi-meta <<EOF
-Section: utils
-Priority: optional
-Standards-Version: 4.7.0
-
-Package: yazi
-Version: ${VER}
-Architecture: all
-Depends: yazi-fm (= ${VER}), yazi-cli (= ${VER})
-Description: Meta package to install Yazi TUI and ya CLI
- This package pulls both yazi (TUI) and ya (CLI).
-EOF
-          equivs-build yazi-meta
-          cp yazi_${VER}_all.deb pkgs/yazi/${{ steps.tag.outputs.TAG }}/
+          Section: utils
+          Priority: optional
+          Standards-Version: 4.7.0
+          
+          Package: yazi
+          Version: ${VER}
+          Architecture: all
+          Depends: yazi-fm (= ${VER}), yazi-cli (= ${VER})
+          Description: Meta package to install Yazi TUI and ya CLI
+           This package pulls both yazi (TUI) and ya (CLI).
+          EOF
+                    equivs-build yazi-meta
+                    cp yazi_${VER}_all.deb pkgs/yazi/${{ steps.tag.outputs.TAG }}/
 
       # 5) Commit + tag
       - name: Commit debs & tag
