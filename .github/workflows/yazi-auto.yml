@@ -1,0 +1,114 @@
+name: Auto Yazi → APT + Release
+
+on:
+  schedule: [{ cron: "15 3 * * *" }]     # quét mỗi ngày
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  DISTRO: trixie
+  COMPONENT: main
+
+jobs:
+  build-publish:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Lấy tag mới nhất upstream
+      - name: Get latest upstream tag
+        id: tag
+        run: |
+          TAG=$(curl -fsSL https://api.github.com/repos/sxyazi/yazi/releases/latest | jq -r .tag_name)
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+          if git rev-parse -q --verify "refs/tags/yazi-$TAG" >/dev/null; then
+            echo "already_built=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Stop (already built)
+        if: steps.tag.outputs.already_built == 'true'
+        run: echo "No new tag."
+
+      - name: Install toolchain
+        if: steps.tag.outputs.already_built != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl git build-essential dpkg-dev gnupg aptly
+          curl -fsSL https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          cargo install cargo-deb
+
+      # Build .deb
+      - name: Build Yazi debs
+        if: steps.tag.outputs.already_built != 'true'
+        run: |
+          git clone --depth=1 --branch "${{ steps.tag.outputs.TAG }}" https://github.com/sxyazi/yazi.git
+          cd yazi
+          cargo deb -p yazi-fm
+          cargo deb -p yazi-cli
+          mkdir -p ../pkgs/yazi/${{ steps.tag.outputs.TAG }}
+          cp target/debian/*.deb ../pkgs/yazi/${{ steps.tag.outputs.TAG }}/
+
+      # Commit & tag
+      - name: Commit debs & tag
+        if: steps.tag.outputs.already_built != 'true'
+        run: |
+          git config user.name  "kivotos-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add pkgs/yazi/${{ steps.tag.outputs.TAG }}/
+          git commit -m "yazi: add ${{ steps.tag.outputs.TAG }} debs"
+          git tag -a "yazi-${{ steps.tag.outputs.TAG }}" -m "Yazi ${{ steps.tag.outputs.TAG }}"
+          git push --follow-tags
+
+      # GPG & aptly config
+      - name: Setup GPG & aptly
+        run: |
+          mkdir -p ~/.gnupg
+          echo 'allow-loopback-pinentry' > ~/.gnupg/gpg-agent.conf
+          echo 'pinentry-mode loopback'  > ~/.gnupg/gpg.conf
+          gpgconf --reload gpg-agent
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --yes --import
+          echo "KEYID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5; exit}')" >> $GITHUB_ENV
+          mkdir -p site
+          cat > ~/.aptly.conf <<'JSON'
+          {
+            "rootDir": ".aptly",
+            "downloadConcurrency": 4,
+            "FileSystemPublishEndpoints": { "site": { "rootDir": "site", "linkMethod": "copy" } }
+          }
+          JSON
+
+      # Publish toàn bộ pkgs/ vào APT repo + copy deb theo version lên Pages
+      - name: Publish APT (aptly → site/)
+        env: { GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }} }
+        run: |
+          rm -rf site && mkdir -p site
+          aptly repo create -distribution=${DISTRO} -component=${COMPONENT} kivotos || true
+          find pkgs -name '*.deb' -print -exec aptly repo add kivotos {} \;
+          aptly publish repo -architectures=amd64 -gpg-key="${KEYID}" -passphrase="${GPG_PASSPHRASE}" \
+            -distribution=${DISTRO} kivotos filesystem:site:
+          # thư mục hiển thị theo phiên bản
+          mkdir -p site/yazi/${{ steps.tag.outputs.TAG }}
+          cp pkgs/yazi/${{ steps.tag.outputs.TAG }}/*.deb site/yazi/${{ steps.tag.outputs.TAG }}/ || true
+          gpg --armor --export "${KEYID}" > site/pubkey.gpg
+          touch site/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+
+      - name: Deploy to Pages
+        uses: actions/deploy-pages@v4
+
+      # Release kèm asset .deb
+      - name: Create Release
+        if: steps.tag.outputs.already_built != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: yazi-${{ steps.tag.outputs.TAG }}
+          name: "Yazi ${{ steps.tag.outputs.TAG }}"
+          files: pkgs/yazi/${{ steps.tag.outputs.TAG }}/*.deb
