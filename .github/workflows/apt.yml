@@ -42,7 +42,7 @@ jobs:
             "FileSystemPublishEndpoints": {
               "site": {
                 "rootDir": "site",
-                "linkMethod": "copy"   // or "hardlink" if you prefer
+                "linkMethod": "copy"
               }
             }
           }
