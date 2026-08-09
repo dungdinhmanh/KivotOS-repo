@@ -175,7 +175,7 @@ def cmd_update(args) -> None:
             print(f"⚠ Error parsing {toml_file}: {e}", file=sys.stderr)
             continue
         repo = data.get("repo")
-        if repo:
+        if repo and data.get("update", True):
             to_check.append((pkg_name_of(toml_file), repo))
 
     if not to_check:

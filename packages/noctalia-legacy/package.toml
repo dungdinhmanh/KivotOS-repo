@@ -1,6 +1,7 @@
 name = "noctalia-legacy"
 repo = "github:noctalia-dev/noctalia"
 version = "v4.7.7"
+update = false
 type = "custom"
 build = "bash ../packages/noctalia-legacy/build.sh"
 binary = "qs"
