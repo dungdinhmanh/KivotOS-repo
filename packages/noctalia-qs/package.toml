@@ -29,6 +29,7 @@ build = [
     "libdrm-dev",
     "wayland-protocols",
     "libgbm-dev",
+    "libegl-dev",
     "libvulkan-dev",
     "libxcb1-dev",
     "libpipewire-0.3-dev",
