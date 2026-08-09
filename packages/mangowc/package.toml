@@ -86,14 +86,14 @@ priority = "optional"
 homepage = "https://github.com/mangowm/mango"
 
 [install]
-"build/stage/usr/bin/mango" = "/usr/bin/mangowc"
-"build/stage/usr/bin/mmsg" = "/usr/bin/mmsg"
-"build/stage/usr/share/wayland-sessions/mango.desktop" = "/usr/share/wayland-sessions/mango.desktop"
-"build/stage/usr/share/xdg-desktop-portal/mango-portals.conf" = "/usr/share/xdg-desktop-portal/mango-portals.conf"
-"build/stage/etc/mango/config.conf" = "/etc/mango/config.conf"
-"build/stage/usr/share/man/man1/mmsg.1" = "/usr/share/man/man1/mmsg.1"
-"build/local/lib/x86_64-linux-gnu/libwlroots-0.20.so" = "/usr/lib/x86_64-linux-gnu/libwlroots-0.20.so"
-"build/local/lib/x86_64-linux-gnu/libscenefx-0.5.so" = "/usr/lib/x86_64-linux-gnu/libscenefx-0.5.so"
+"package-root/usr/bin/mango" = "/usr/bin/mangowc"
+"package-root/usr/bin/mmsg" = "/usr/bin/mmsg"
+"package-root/usr/share/wayland-sessions/mango.desktop" = "/usr/share/wayland-sessions/mango.desktop"
+"package-root/usr/share/xdg-desktop-portal/mango-portals.conf" = "/usr/share/xdg-desktop-portal/mango-portals.conf"
+"package-root/etc/mango/config.conf" = "/etc/mango/config.conf"
+"package-root/usr/share/man/man1/mmsg.1" = "/usr/share/man/man1/mmsg.1"
+"package-root/usr/lib/x86_64-linux-gnu/libwlroots-0.20.so" = "/usr/lib/x86_64-linux-gnu/libwlroots-0.20.so"
+"package-root/usr/lib/x86_64-linux-gnu/libscenefx-0.5.so" = "/usr/lib/x86_64-linux-gnu/libscenefx-0.5.so"
 
 [cache]
 paths = ["build/local", "build/deps"]

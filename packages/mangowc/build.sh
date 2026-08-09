@@ -13,6 +13,7 @@ SRC_DIR="$(pwd)"
 ROOT_DIR="$(cd .. && pwd)"
 DEPS_DIR="$ROOT_DIR/build/deps"
 LOCAL_PREFIX="$ROOT_DIR/build/local"
+STAGE_DIR="$SRC_DIR/package-root"
 mkdir -p "$DEPS_DIR" "$LOCAL_PREFIX"
 
 export PATH="$LOCAL_PREFIX/bin:$PATH"
@@ -98,12 +99,17 @@ echo ""
 echo "=== Building mangowc ==="
 cd "$SRC_DIR"
 
-rm -rf build "$ROOT_DIR/build/stage"
+rm -rf build "$STAGE_DIR"
 meson setup build --prefix=/usr --buildtype=release
 ninja -C build
-DESTDIR="$ROOT_DIR/build/stage" meson install -C build
+DESTDIR="$STAGE_DIR" meson install -C build
+install -d "$STAGE_DIR/usr/lib/x86_64-linux-gnu"
+install -m755 \
+  "$LOCAL_PREFIX/lib/x86_64-linux-gnu/libwlroots-0.20.so" \
+  "$LOCAL_PREFIX/lib/x86_64-linux-gnu/libscenefx-0.5.so" \
+  "$STAGE_DIR/usr/lib/x86_64-linux-gnu/"
 
-mango_binary="$ROOT_DIR/build/stage/usr/bin/mango"
+mango_binary="$STAGE_DIR/usr/bin/mango"
 ldd_output="$(LD_LIBRARY_PATH="$LOCAL_PREFIX/lib/x86_64-linux-gnu" ldd "$mango_binary")"
 printf '%s\n' "$ldd_output"
 if printf '%s\n' "$ldd_output" | grep -q 'not found'; then
@@ -115,6 +121,6 @@ fi
 
 ls -lh \
   "$mango_binary" \
-  "$ROOT_DIR/build/stage/usr/bin/mmsg" \
-  "$LOCAL_PREFIX/lib/x86_64-linux-gnu/libwlroots-0.20.so" \
-  "$LOCAL_PREFIX/lib/x86_64-linux-gnu/libscenefx-0.5.so"
+  "$STAGE_DIR/usr/bin/mmsg" \
+  "$STAGE_DIR/usr/lib/x86_64-linux-gnu/libwlroots-0.20.so" \
+  "$STAGE_DIR/usr/lib/x86_64-linux-gnu/libscenefx-0.5.so"
