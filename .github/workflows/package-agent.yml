@@ -1,0 +1,37 @@
+name: Autonomous Package Agent
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: package-agent-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    if: contains(github.event.issue.body, '### Upstream repository URL')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.x"
+
+      - name: Run autonomous package agent
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_URL: ${{ vars.AI_URL || 'https://ollama.com/api/chat' }}
+          AI_MODEL: ${{ vars.AI_MODEL || 'deepseek-v4-flash' }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python scripts/package_agent.py --issue "${{ github.event.issue.number }}"

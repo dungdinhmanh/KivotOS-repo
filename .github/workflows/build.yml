@@ -52,13 +52,32 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
 
+      - name: Detect changed packages
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" != "push" || -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
+            printf '%s\n' '{"mode":"full","packages":[],"reason":"manual or non-push workflow"}' > /tmp/changes.json
+          else
+            git fetch --no-tags origin "$BASE_SHA"
+            python scripts/changed_packages.py \
+              --base "$BASE_SHA" \
+              --head "$GITHUB_SHA" > /tmp/changes.json
+          fi
+          cat /tmp/changes.json
+
       - name: Generate matrix
         id: set-matrix
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          MATRIX=$(python scripts/manager.py matrix)
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          MODE=$(python -c 'import json; print(json.load(open("/tmp/changes.json"))["mode"])')
+          if [[ "$MODE" == "partial" ]]; then
+            PACKAGES=$(python -c 'import json; print(",".join(json.load(open("/tmp/changes.json"))["packages"]))')
+            MATRIX=$(python scripts/manager.py matrix --packages "$PACKAGES")
+          else
+            MATRIX=$(python scripts/manager.py matrix)
+          fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
   build:
     needs: matrix

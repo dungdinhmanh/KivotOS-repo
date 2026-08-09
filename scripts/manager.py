@@ -175,7 +175,7 @@ def cmd_update(args) -> None:
             print(f"⚠ Error parsing {toml_file}: {e}", file=sys.stderr)
             continue
         repo = data.get("repo")
-        if repo:
+        if repo and data.get("update", True):
             to_check.append((pkg_name_of(toml_file), repo))
 
     if not to_check:
@@ -209,14 +209,39 @@ def cmd_update(args) -> None:
     set_output("updated", "true" if updated else "false")
 
 
+def dependency_closure(selected: set[str], manifests: dict[str, dict]) -> set[str]:
+    changed = set(selected)
+    while True:
+        expanded = {
+            name
+            for name, data in manifests.items()
+            if name not in changed
+            and any(dep in changed for dep in data.get("depends", {}).get("runtime", []))
+        }
+        if not expanded:
+            return changed
+        changed.update(expanded)
+
+
 def cmd_matrix(args) -> None:
     lock = load_lock()
     repository = load_repository()
     build_image = f"debian:{repository['distribution']}-slim"
+    manifests = {}
+    for toml_file in iter_package_tomls():
+        try:
+            manifests[pkg_name_of(toml_file)] = toml.loads(toml_file.read_text())
+        except toml.TomlDecodeError as e:
+            print(f"⚠ Error parsing {toml_file}: {e}", file=sys.stderr)
+    selected = None
+    if args.packages:
+        selected = dependency_closure(set(args.packages.split(",")), manifests)
 
     matrix = []
     for toml_file in iter_package_tomls():
         pkg_name = pkg_name_of(toml_file)
+        if selected is not None and pkg_name not in selected:
+            continue
 
         try:
             data = toml.loads(toml_file.read_text())
@@ -282,7 +307,12 @@ Examples:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("matrix", help="Generate GitHub Actions build matrix")
+    p_matrix = sub.add_parser("matrix", help="Generate GitHub Actions build matrix")
+    p_matrix.add_argument(
+        "--packages",
+        default=None,
+        help="Comma-separated package names; include reverse runtime dependencies",
+    )
 
     p_update = sub.add_parser("update", help="Check and update package versions")
     p_update.add_argument("--package", "-p", default=None,

@@ -1,0 +1,47 @@
+name: Package request
+description: Request an upstream project to be packaged for KivotOS
+title: "[Package Request] "
+labels:
+  - package-request
+  - triage
+body:
+  - type: input
+    id: upstream-url
+    attributes:
+      label: Upstream repository URL
+      description: Official GitHub, Codeberg, or GitLab repository URL
+      placeholder: https://github.com/owner/project
+    validations:
+      required: true
+
+  - type: input
+    id: package-name
+    attributes:
+      label: Desired package name
+      description: Debian package name, if known
+      placeholder: project
+    validations:
+      required: true
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Package purpose
+      description: What is the project and why should KivotOS package it?
+    validations:
+      required: true
+
+  - type: input
+    id: binary
+    attributes:
+      label: Expected command or binary
+      description: The command users should be able to run, if applicable
+      placeholder: project
+
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Request confirmation
+      options:
+        - label: I understand that the package will be reviewed before merging.
+          required: true
