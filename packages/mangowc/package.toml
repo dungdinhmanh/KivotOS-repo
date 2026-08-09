@@ -46,14 +46,31 @@ build = [
     "libpango1.0-dev"
 ]
 runtime = [
-    "libwayland-client0",
     "libdrm2",
     "libxkbcommon0",
     "libpixman-1-0",
     "libdisplay-info2",
     "libliftoff0",
     "libseat1",
+    "libinput10",
+    "libudev1",
+    "libffi8",
+    "libgbm1",
+    "libegl1",
+    "libgles2",
     "libpcre2-8-0",
+    "libcjson1",
+    "libpangocairo-1.0-0",
+    "libpango-1.0-0",
+    "libcairo2",
+    "libxcb1",
+    "libxcb-composite0",
+    "libxcb-ewmh2",
+    "libxcb-icccm4",
+    "libxcb-render0",
+    "libxcb-res0",
+    "libxcb-xfixes0",
+    "hwdata",
     "xwayland"
 ]
 optional = []
@@ -69,8 +86,14 @@ priority = "optional"
 homepage = "https://github.com/mangowm/mango"
 
 [install]
-"build/mango" = "/usr/bin/mangowc"
-"build/mmsg" = "/usr/bin/mmsg"
+"build/stage/usr/bin/mango" = "/usr/bin/mangowc"
+"build/stage/usr/bin/mmsg" = "/usr/bin/mmsg"
+"build/stage/usr/share/wayland-sessions/mango.desktop" = "/usr/share/wayland-sessions/mango.desktop"
+"build/stage/usr/share/xdg-desktop-portal/mango-portals.conf" = "/usr/share/xdg-desktop-portal/mango-portals.conf"
+"build/stage/etc/mango/config.conf" = "/etc/mango/config.conf"
+"build/stage/usr/share/man/man1/mmsg.1" = "/usr/share/man/man1/mmsg.1"
+"build/local/lib/x86_64-linux-gnu/libwlroots-0.20.so" = "/usr/lib/x86_64-linux-gnu/libwlroots-0.20.so"
+"build/local/lib/x86_64-linux-gnu/libscenefx-0.5.so" = "/usr/lib/x86_64-linux-gnu/libscenefx-0.5.so"
 
 [cache]
 paths = ["build/local", "build/deps"]

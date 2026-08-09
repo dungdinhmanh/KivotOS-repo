@@ -30,8 +30,8 @@ echo "  prefix:   $LOCAL_PREFIX"
 echo ""
 
 build_dep() {
-  local name="$1" version="$2" url="$3" tag="$4"
-  shift 4
+  local name="$1" version="$2" url="$3" tag="$4" library_type="$5"
+  shift 5
   local meson_args=("$@")
 
   echo ""
@@ -50,7 +50,7 @@ build_dep() {
 
   local commit stamp
   commit="$(git rev-parse HEAD)"
-  stamp="$LOCAL_PREFIX/.${name}-${version}-${commit}.stamp"
+  stamp="$LOCAL_PREFIX/.${name}-${version}-${commit}-${library_type}.stamp"
   if [ -f "$stamp" ]; then
     echo "  (stamp present: skipping rebuild)"
     return 0
@@ -60,7 +60,7 @@ build_dep() {
   meson setup build \
     --prefix="$LOCAL_PREFIX" \
     --buildtype=release \
-    -Ddefault_library=static \
+    -Ddefault_library="$library_type" \
     "${meson_args[@]}"
   ninja -C build
   ninja -C build install
@@ -68,44 +68,53 @@ build_dep() {
 }
 
 build_dep pixman "$PIXMAN_VERSION" \
-  "https://gitlab.freedesktop.org/pixman/pixman.git" "pixman-$PIXMAN_VERSION"
+  "https://gitlab.freedesktop.org/pixman/pixman.git" "pixman-$PIXMAN_VERSION" static
 
 build_dep wayland "$WAYLAND_VERSION" \
-  "https://gitlab.freedesktop.org/wayland/wayland.git" "$WAYLAND_VERSION" \
+  "https://gitlab.freedesktop.org/wayland/wayland.git" "$WAYLAND_VERSION" static \
   -Ddocumentation=false -Dtests=false
 
 build_dep wayland-protocols "$WAYLAND_PROTOCOLS_VERSION" \
-  "https://gitlab.freedesktop.org/wayland/wayland-protocols.git" "$WAYLAND_PROTOCOLS_VERSION"
+  "https://gitlab.freedesktop.org/wayland/wayland-protocols.git" "$WAYLAND_PROTOCOLS_VERSION" static
 
 build_dep libdrm "$LIBDRM_VERSION" \
-  "https://gitlab.freedesktop.org/mesa/drm.git" "libdrm-$LIBDRM_VERSION" \
+  "https://gitlab.freedesktop.org/mesa/drm.git" "libdrm-$LIBDRM_VERSION" static \
   -Dauto_features=disabled -Dtests=false
 
 build_dep xkbcommon "$XKBCOMMON_VERSION" \
-  "https://github.com/xkbcommon/libxkbcommon.git" "xkbcommon-$XKBCOMMON_VERSION" \
+  "https://github.com/xkbcommon/libxkbcommon.git" "xkbcommon-$XKBCOMMON_VERSION" static \
   -Denable-tools=false -Denable-x11=false -Denable-docs=false \
   -Denable-wayland=false -Denable-xkbregistry=false -Denable-bash-completion=false
 
 build_dep wlroots "$WLROOTS_VERSION" \
-  "https://gitlab.freedesktop.org/wlroots/wlroots.git" "$WLROOTS_VERSION" \
+  "https://gitlab.freedesktop.org/wlroots/wlroots.git" "$WLROOTS_VERSION" shared \
   -Dbackends=drm,libinput -Drenderers=gles2 -Dexamples=false -Dxwayland=enabled
 
 build_dep scenefx "$SCENEFX_VERSION" \
-  "https://github.com/wlrfx/scenefx.git" "0.5" \
+  "https://github.com/wlrfx/scenefx.git" "0.5" shared \
   -Dexamples=false
 
 echo ""
 echo "=== Building mangowc ==="
 cd "$SRC_DIR"
 
-rm -rf build
+rm -rf build "$ROOT_DIR/build/stage"
 meson setup build --prefix=/usr --buildtype=release
 ninja -C build
+DESTDIR="$ROOT_DIR/build/stage" meson install -C build
 
-ldd_output="$(ldd build/mango)"
+mango_binary="$ROOT_DIR/build/stage/usr/bin/mango"
+ldd_output="$(LD_LIBRARY_PATH="$LOCAL_PREFIX/lib/x86_64-linux-gnu" ldd "$mango_binary")"
 printf '%s\n' "$ldd_output"
-if printf '%s\n' "$ldd_output" | grep -qE 'not found|build/local'; then
+if printf '%s\n' "$ldd_output" | grep -q 'not found'; then
+  exit 1
+fi
+if readelf -d "$mango_binary" | grep -Fq "$ROOT_DIR"; then
   exit 1
 fi
 
-ls -lh build/mango build/mmsg
+ls -lh \
+  "$mango_binary" \
+  "$ROOT_DIR/build/stage/usr/bin/mmsg" \
+  "$LOCAL_PREFIX/lib/x86_64-linux-gnu/libwlroots-0.20.so" \
+  "$LOCAL_PREFIX/lib/x86_64-linux-gnu/libscenefx-0.5.so"
