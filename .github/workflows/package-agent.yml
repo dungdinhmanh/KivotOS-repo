@@ -31,7 +31,7 @@ jobs:
       - name: Run autonomous package agent
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
-          AI_URL: ${{ vars.AI_URL || 'https://ollama.com/api/chat' }}
-          AI_MODEL: ${{ vars.AI_MODEL || 'deepseek-v4-flash' }}
+          AI_URL: ${{ vars.AI_URL }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python scripts/package_agent.py --issue "${{ github.event.issue.number }}"

@@ -91,8 +91,10 @@ def call_ai(instructions: str, context: dict) -> dict:
     api_key = os.environ.get("AI_API_KEY") or os.environ.get("OLLAMA_API_KEY")
     if not api_key:
         raise RuntimeError("AI_API_KEY is not configured")
-    url = os.environ.get("AI_URL", "https://ollama.com/api/chat")
-    model = os.environ.get("AI_MODEL", "deepseek-v4-flash")
+    url = os.environ.get("AI_URL")
+    model = os.environ.get("AI_MODEL")
+    if not url or not model:
+        raise RuntimeError("AI_URL and AI_MODEL must be configured")
     payload = {
         "model": model,
         "messages": [
