@@ -8,34 +8,19 @@ Commands:
     nfpm-config - Generate nfpm.yaml for a single package (used by CI)
 """
 
-import os
-import json
 import argparse
-import sys
-import subprocess
 import concurrent.futures
+import json
+import os
+import sys
 from pathlib import Path
 
-try:
-    import toml
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "toml", "-q"])
-    import toml
+import toml
+import yaml
 
-try:
-    import requests
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests", "-q"])
-    import requests
-
-try:
-    import yaml
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyyaml", "-q"])
-    import yaml
-
-LOCK_FILE    = Path("packages.lock")
-PACKAGES_DIR = Path("packages")
+LOCK_FILE       = Path("packages.lock")
+PACKAGES_DIR    = Path("packages")
+REPOSITORY_FILE = Path("repository.toml")
 GITHUB_API   = "https://api.github.com"
 CODEBERG_API = "https://codeberg.org/api/v1"
 REQUEST_TIMEOUT = 10
@@ -48,6 +33,10 @@ def iter_package_tomls() -> list[Path]:
 
 def pkg_name_of(toml_path: Path) -> str:
     return toml_path.parent.name
+
+
+def load_repository() -> dict:
+    return toml.loads(REPOSITORY_FILE.read_text())["repository"]
 
 
 def load_lock() -> dict[str, str]:
@@ -70,6 +59,8 @@ def save_lock(lock: dict[str, str]) -> None:
 
 def get_latest_version(repo: str) -> str | None:
     """Resolve "github:owner/repo" or "codeberg:owner/repo" to its latest tag."""
+    import requests
+
     if ":" not in repo:
         return None
 
@@ -98,7 +89,7 @@ def get_latest_version(repo: str) -> str | None:
         print(f"  ⏱ Timeout: {repo}", file=sys.stderr)
     except requests.exceptions.HTTPError as e:
         print(f"  ❌ HTTP {e.response.status_code}: {repo}", file=sys.stderr)
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         print(f"  ❌ Error fetching {repo}: {e}", file=sys.stderr)
 
     return None
@@ -109,59 +100,6 @@ def _check_one(args: tuple) -> tuple[str, str | None]:
     print(f"  checking {pkg_name} ({repo})...", flush=True)
     return pkg_name, get_latest_version(repo)
 
-
-def _get_changed_packages() -> set[str] | None:
-    """
-    Detect which packages need rebuilding by diffing against HEAD~1.
-    Returns None when running outside CI or when scripts/ changed
-    (signal to rebuild everything).
-    """
-    if not os.environ.get("GITHUB_ACTIONS"):
-        return None
-    event = os.environ.get("GITHUB_EVENT_NAME", "")
-    if event == "workflow_dispatch":
-        return None
-    try:
-        diff = subprocess.run(
-            ["git", "diff", "HEAD~1", "HEAD", "--", str(LOCK_FILE)],
-            capture_output=True, text=True, timeout=10
-        )
-
-        changed: set[str] = set()
-        if diff.returncode == 0 and diff.stdout.strip():
-            for line in diff.stdout.splitlines():
-                if line.startswith("+") and not line.startswith("+++") and "=" in line:
-                    pkg = line[1:].split("=")[0].strip()
-                    if pkg and not pkg.startswith("#"):
-                        changed.add(pkg)
-
-        pkg_diff = subprocess.run(
-            ["git", "diff", "HEAD~1", "HEAD", "--name-only", "--", "packages/"],
-            capture_output=True, text=True, timeout=10
-        )
-        if pkg_diff.returncode == 0:
-            for path in pkg_diff.stdout.splitlines():
-                parts = path.split("/")
-                if len(parts) >= 2 and parts[0] == "packages":
-                    changed.add(parts[1])
-
-        if not changed:
-            return None
-
-        scripts_diff = subprocess.run(
-            ["git", "diff", "HEAD~1", "HEAD", "--name-only", "--", "scripts/"],
-            capture_output=True, text=True, timeout=10
-        )
-        if scripts_diff.stdout.strip():
-            print("scripts/ changed → rebuilding all packages", file=sys.stderr)
-            return None
-
-        print(f"Changed packages: {', '.join(sorted(changed))}", file=sys.stderr)
-        return changed
-
-    except Exception as e:
-        print(f"Could not detect changes: {e} → rebuilding all", file=sys.stderr)
-        return None
 
 
 def generate_nfpm_yaml(pkg: dict, src_dir: str = "src") -> str:
@@ -233,7 +171,7 @@ def cmd_update(args) -> None:
     for toml_file in all_toml:
         try:
             data = toml.loads(toml_file.read_text())
-        except Exception as e:
+        except toml.TomlDecodeError as e:
             print(f"⚠ Error parsing {toml_file}: {e}", file=sys.stderr)
             continue
         repo = data.get("repo")
@@ -273,18 +211,16 @@ def cmd_update(args) -> None:
 
 def cmd_matrix(args) -> None:
     lock = load_lock()
-    changed = _get_changed_packages()
+    repository = load_repository()
+    build_image = f"debian:{repository['distribution']}-slim"
 
     matrix = []
     for toml_file in iter_package_tomls():
         pkg_name = pkg_name_of(toml_file)
 
-        if changed is not None and pkg_name not in changed:
-            continue
-
         try:
             data = toml.loads(toml_file.read_text())
-        except Exception as e:
+        except toml.TomlDecodeError as e:
             print(f"⚠ Error parsing {toml_file}: {e}", file=sys.stderr)
             continue
 
@@ -308,6 +244,7 @@ def cmd_matrix(args) -> None:
             "description": data.get("description", ""),
             "license":     data.get("license", ""),
             "cache":       data.get("cache", None),
+            "build_image": build_image,
         })
 
     if not matrix:

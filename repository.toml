@@ -1,0 +1,6 @@
+[repository]
+name = "kivotos"
+public_url = "https://kivotos-repo.dungdinhmanh0209.workers.dev"
+distribution = "trixie"
+component = "main"
+architectures = ["amd64"]

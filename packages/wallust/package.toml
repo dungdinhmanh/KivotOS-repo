@@ -2,6 +2,7 @@ name = "wallust"
 repo = "codeberg:explosion-mental/wallust"
 version = "latest"
 type = "custom"
+toolchain = "stable"
 build = "cargo build --release --bin wallust"
 binary = "wallust"
 description = "Generate color palettes from images"
@@ -9,7 +10,7 @@ license = "MIT"
 homepage = "https://codeberg.org/explosion-mental/wallust"
 
 [depends]
-build = ["rustc", "cargo", "git", "make"]
+build = ["git", "make"]
 runtime = ["imagemagick"]
 
 [distro]

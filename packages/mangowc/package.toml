@@ -1,12 +1,12 @@
 name = "mangowc"
-repo = "github:DreamMaoMao/mangowc"
+repo = "github:mangowm/mango"
 version = "latest"
 type = "custom"
 build = "bash ../packages/mangowc/build.sh"
 binary = "mangowc"
 description = "A Wayland compositor based on wlroots and scenefx (dwm but wayland)"
 license = "MIT"
-homepage = "https://github.com/DreamMaoMao/mangowc"
+homepage = "https://github.com/mangowm/mango"
 
 [depends]
 build = [
@@ -15,6 +15,7 @@ build = [
     "ninja-build",
     "pkg-config",
     "cmake",
+    "bison",
     "libxml2-dev",
     "libffi-dev",
     "libegl-dev",
@@ -40,17 +41,36 @@ build = [
     "libudev-dev",
     "libmtdev-dev",
     "libevdev-dev",
-    "libcjson-dev"
+    "libinput-dev",
+    "libcjson-dev",
+    "libpango1.0-dev"
 ]
 runtime = [
-    "libwayland-client0",
     "libdrm2",
     "libxkbcommon0",
     "libpixman-1-0",
-    "libdisplay-info1",
+    "libdisplay-info2",
     "libliftoff0",
     "libseat1",
+    "libinput10",
+    "libudev1",
+    "libffi8",
+    "libgbm1",
+    "libegl1",
+    "libgles2",
     "libpcre2-8-0",
+    "libcjson1",
+    "libpangocairo-1.0-0",
+    "libpango-1.0-0",
+    "libcairo2",
+    "libxcb1",
+    "libxcb-composite0",
+    "libxcb-ewmh2",
+    "libxcb-icccm4",
+    "libxcb-render0",
+    "libxcb-res0",
+    "libxcb-xfixes0",
+    "hwdata",
     "xwayland"
 ]
 optional = []
@@ -63,11 +83,17 @@ arch = "amd64"
 maintainer = "Dinh Manh Dung <dungdinhmanh0209@gmail.com>"
 section = "x11"
 priority = "optional"
-homepage = "https://github.com/DreamMaoMao/mangowc"
+homepage = "https://github.com/mangowm/mango"
 
 [install]
-"build/mango" = "/usr/bin/mangowc"
-"build/mmsg" = "/usr/bin/mmsg"
+"package-root/usr/bin/mango" = "/usr/bin/mangowc"
+"package-root/usr/bin/mmsg" = "/usr/bin/mmsg"
+"package-root/usr/share/wayland-sessions/mango.desktop" = "/usr/share/wayland-sessions/mango.desktop"
+"package-root/usr/share/xdg-desktop-portal/mango-portals.conf" = "/usr/share/xdg-desktop-portal/mango-portals.conf"
+"package-root/etc/mango/config.conf" = "/etc/mango/config.conf"
+"package-root/usr/share/man/man1/mmsg.1" = "/usr/share/man/man1/mmsg.1"
+"package-root/usr/lib/x86_64-linux-gnu/libwlroots-0.20.so" = "/usr/lib/x86_64-linux-gnu/libwlroots-0.20.so"
+"package-root/usr/lib/x86_64-linux-gnu/libscenefx-0.5.so" = "/usr/lib/x86_64-linux-gnu/libscenefx-0.5.so"
 
 [cache]
 paths = ["build/local", "build/deps"]
