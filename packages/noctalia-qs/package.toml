@@ -26,6 +26,7 @@ build = [
     "libcli11-dev",
     "libjemalloc-dev",
     "libwayland-dev",
+    "libdrm-dev",
     "wayland-protocols",
     "libgbm-dev",
     "libvulkan-dev",
