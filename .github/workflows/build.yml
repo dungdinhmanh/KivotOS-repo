@@ -6,12 +6,20 @@ on:
     paths:
       - "packages/**"
       - "packages.lock"
+      - "repository.toml"
       - "scripts/**"
+      - ".github/workflows/build.yml"
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish verified artifacts to production
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   actions: read
@@ -42,6 +50,9 @@ jobs:
 
       - name: Install deps
         run: pip install toml requests pyyaml
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
 
       - name: Generate matrix
         id: set-matrix
@@ -237,22 +248,57 @@ jobs:
           path: dist/*.deb
           retention-days: 7
 
-  publish:
+  verify:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 20
+    outputs:
+      repository: ${{ steps.verify.outputs.repository }}
+      distribution: ${{ steps.verify.outputs.distribution }}
+      component: ${{ steps.verify.outputs.component }}
+      architecture: ${{ steps.verify.outputs.architecture }}
     steps:
-      - uses:   actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.2
         with:
           filter: blob:none
 
-      - name: Download all .deb artifacts
-        uses:   actions/download-artifact@v8.0.1
+      - name: Download candidate artifacts
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: deb-*
-          path: all-debs
+          path: candidate-debs
           merge-multiple: true
+
+      - name: Verify complete package set
+        id: verify
+        run: |
+          python3 scripts/verify_artifacts.py \
+            --artifacts candidate-debs \
+            --publish-set verified-debs
+
+      - name: Upload verified package set
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: verified-debs
+          path: verified-debs/*.deb
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.publish
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          filter: blob:none
+
+      - name: Download verified .deb artifacts
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: verified-debs
+          path: all-debs
 
       - name: Setup aptly
         run: |
@@ -282,6 +328,10 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ACCOUNT_ID:        ${{ secrets.R2_ACCOUNT_ID }}
           R2_BUCKET:            ${{ secrets.R2_BUCKET }}
+          REPOSITORY:           ${{ needs.verify.outputs.repository }}
+          DISTRIBUTION:         ${{ needs.verify.outputs.distribution }}
+          COMPONENT:            ${{ needs.verify.outputs.component }}
+          ARCHITECTURE:         ${{ needs.verify.outputs.architecture }}
         run: |
           KEY_ID=$(gpg --list-secret-keys --keyid-format LONG \
                    | grep sec | awk '{print $2}' | cut -d/ -f2 | head -n1)
@@ -305,34 +355,26 @@ jobs:
           }
           JSON
 
-          aptly repo create -distribution=trixie -component=main kivotos
+          aptly repo create \
+            -distribution="$DISTRIBUTION" \
+            -component="$COMPONENT" \
+            "$REPOSITORY"
 
-          find all-debs -name "*.deb" -exec aptly repo add -force-replace kivotos {} +
+          find all-debs -name "*.deb" -exec aptly repo add -force-replace "$REPOSITORY" {} +
 
           echo "📦 Packages to publish:"
-          aptly repo show -with-packages kivotos
+          aptly repo show -with-packages "$REPOSITORY"
 
-          if aptly publish show trixie s3:r2: &>/dev/null; then
-            echo "🔄 Updating existing publication..."
-            aptly publish update \
-              -force-overwrite \
-              -gpg-key="$KEY_ID" \
-              -passphrase="$GPG_PASSPHRASE" \
-              trixie s3:r2:
-          else
-            echo "🚀 Publishing for the first time..."
-            aptly publish repo \
-              -force-overwrite \
-              -distribution=trixie \
-              -architectures=amd64 \
-              -gpg-key="$KEY_ID" \
-              -passphrase="$GPG_PASSPHRASE" \
-              kivotos s3:r2:
-          fi
+          aptly publish repo \
+            -force-overwrite \
+            -distribution="$DISTRIBUTION" \
+            -architectures="$ARCHITECTURE" \
+            -gpg-key="$KEY_ID" \
+            -passphrase="$GPG_PASSPHRASE" \
+            "$REPOSITORY" s3:r2:
 
-          # Thay toàn bộ phần pip install + aws configure + aws s3 cp bằng:
           gpg --export --armor "$KEY_ID" > pubkey.gpg
-          
+
           curl -X PUT \
             "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/pubkey.gpg" \
             --aws-sigv4 "aws:amz:auto:s3" \
@@ -343,8 +385,8 @@ jobs:
           echo "✅ Published to R2 successfully!"
 
   cleanup:
-    needs: [matrix, build, publish]
-    if: always() && needs.build.result == 'success' && github.ref == 'refs/heads/main'
+    needs: [matrix, build, verify, publish]
+    if: always() && needs.publish.result == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -365,8 +407,8 @@ jobs:
             }
 
   report:
-    needs: [matrix, build, publish]
-    if: always() && (needs.matrix.result == 'failure' || needs.build.result == 'failure')
+    needs: [matrix, build, verify, publish]
+    if: always() && (needs.matrix.result == 'failure' || needs.build.result == 'failure' || needs.verify.result == 'failure' || needs.publish.result == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: ci

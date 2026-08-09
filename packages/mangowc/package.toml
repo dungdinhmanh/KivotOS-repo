@@ -47,7 +47,7 @@ runtime = [
     "libdrm2",
     "libxkbcommon0",
     "libpixman-1-0",
-    "libdisplay-info1",
+    "libdisplay-info2",
     "libliftoff0",
     "libseat1",
     "libpcre2-8-0",

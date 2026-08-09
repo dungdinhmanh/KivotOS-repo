@@ -110,59 +110,6 @@ def _check_one(args: tuple) -> tuple[str, str | None]:
     return pkg_name, get_latest_version(repo)
 
 
-def _get_changed_packages() -> set[str] | None:
-    """
-    Detect which packages need rebuilding by diffing against HEAD~1.
-    Returns None when running outside CI or when scripts/ changed
-    (signal to rebuild everything).
-    """
-    if not os.environ.get("GITHUB_ACTIONS"):
-        return None
-    event = os.environ.get("GITHUB_EVENT_NAME", "")
-    if event == "workflow_dispatch":
-        return None
-    try:
-        diff = subprocess.run(
-            ["git", "diff", "HEAD~1", "HEAD", "--", str(LOCK_FILE)],
-            capture_output=True, text=True, timeout=10
-        )
-
-        changed: set[str] = set()
-        if diff.returncode == 0 and diff.stdout.strip():
-            for line in diff.stdout.splitlines():
-                if line.startswith("+") and not line.startswith("+++") and "=" in line:
-                    pkg = line[1:].split("=")[0].strip()
-                    if pkg and not pkg.startswith("#"):
-                        changed.add(pkg)
-
-        pkg_diff = subprocess.run(
-            ["git", "diff", "HEAD~1", "HEAD", "--name-only", "--", "packages/"],
-            capture_output=True, text=True, timeout=10
-        )
-        if pkg_diff.returncode == 0:
-            for path in pkg_diff.stdout.splitlines():
-                parts = path.split("/")
-                if len(parts) >= 2 and parts[0] == "packages":
-                    changed.add(parts[1])
-
-        if not changed:
-            return None
-
-        scripts_diff = subprocess.run(
-            ["git", "diff", "HEAD~1", "HEAD", "--name-only", "--", "scripts/"],
-            capture_output=True, text=True, timeout=10
-        )
-        if scripts_diff.stdout.strip():
-            print("scripts/ changed → rebuilding all packages", file=sys.stderr)
-            return None
-
-        print(f"Changed packages: {', '.join(sorted(changed))}", file=sys.stderr)
-        return changed
-
-    except Exception as e:
-        print(f"Could not detect changes: {e} → rebuilding all", file=sys.stderr)
-        return None
-
 
 def generate_nfpm_yaml(pkg: dict, src_dir: str = "src") -> str:
     """
@@ -273,14 +220,10 @@ def cmd_update(args) -> None:
 
 def cmd_matrix(args) -> None:
     lock = load_lock()
-    changed = _get_changed_packages()
 
     matrix = []
     for toml_file in iter_package_tomls():
         pkg_name = pkg_name_of(toml_file)
-
-        if changed is not None and pkg_name not in changed:
-            continue
 
         try:
             data = toml.loads(toml_file.read_text())
