@@ -53,14 +53,14 @@ class ArtifactGateTests(unittest.TestCase):
         )
         return verify_artifacts.inspect_deb(destination)
 
-    def assemble(self, candidate, production, fetch=None):
+    def assemble(self, candidate, production, fetch=None, candidates=None):
         destination = self.root / "publish"
         workdir = self.root / "work"
         workdir.mkdir(exist_ok=True)
         patch = mock.patch.object(verify_artifacts, "fetch", side_effect=fetch)
         with patch:
             return verify_artifacts.assemble_publish_set(
-                {"sample": candidate},
+                {"sample": candidate} if candidates is None else candidates,
                 {"sample": production},
                 self.specs,
                 self.config,
@@ -112,6 +112,23 @@ class ArtifactGateTests(unittest.TestCase):
         self.assertEqual(result["sample"].version, "1.0.0-2")
         self.assertEqual(result["sample"].sha256, published.sha256)
         self.assertNotEqual(result["sample"].sha256, candidate.sha256)
+
+    def test_preserves_production_artifact_without_candidate(self):
+        published = self.make_deb("published.deb", "1.0.0-2", "published")
+        production = {
+            "Package": "sample",
+            "Version": "1.0.0-2",
+            "Filename": "pool/published.deb",
+            "SHA256": published.sha256,
+        }
+
+        def fetch(_url, destination):
+            shutil.copy2(published.path, destination)
+
+        result = self.assemble(None, production, fetch=fetch, candidates={})
+
+        self.assertEqual(result["sample"].version, "1.0.0-2")
+        self.assertEqual(result["sample"].sha256, published.sha256)
 
     def test_control_parser_preserves_continuations(self):
         records = verify_artifacts.parse_control(

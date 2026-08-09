@@ -100,7 +100,11 @@ def inspect_deb(path: Path) -> DebArtifact:
     )
 
 
-def inspect_artifacts(directory: Path, specs: dict[str, PackageSpec]) -> dict[str, DebArtifact]:
+def inspect_artifacts(
+    directory: Path,
+    specs: dict[str, PackageSpec],
+    require_complete: bool = True,
+) -> dict[str, DebArtifact]:
     artifacts = {}
     paths = sorted(directory.rglob("*.deb"))
     if not paths:
@@ -118,7 +122,7 @@ def inspect_artifacts(directory: Path, specs: dict[str, PackageSpec]) -> dict[st
             )
         artifacts[artifact.package] = artifact
     missing = sorted(set(specs) - set(artifacts))
-    if missing:
+    if missing and require_complete:
         raise ValueError(f"Missing package artifacts: {', '.join(missing)}")
     return artifacts
 
@@ -260,6 +264,20 @@ def assemble_publish_set(
         copy_verified(downloaded, destination / downloaded.name, published_hash)
         print(f"{name}: preserved production artifact for unchanged version {candidate.version}")
 
+    for name in sorted(set(specs) - set(candidates)):
+        current = production.get(name)
+        if not current:
+            raise ValueError(f"{name}: no candidate or production artifact")
+        published_hash = current.get("SHA256")
+        filename = current.get("Filename")
+        if not published_hash or not filename:
+            raise ValueError(f"{name}: production index lacks Filename or SHA256")
+        downloaded = workdir / "production" / name / Path(filename).name
+        downloaded.parent.mkdir(parents=True, exist_ok=True)
+        fetch(urljoin(base_url, filename), downloaded)
+        copy_verified(downloaded, destination / downloaded.name, published_hash)
+        print(f"{name}: preserved production artifact")
+
     return inspect_artifacts(destination, specs)
 
 
@@ -310,7 +328,7 @@ def main() -> int:
     try:
         config = load_repository()
         specs = load_package_specs()
-        candidates = inspect_artifacts(args.artifacts, specs)
+        candidates = inspect_artifacts(args.artifacts, specs, require_complete=False)
         expected_arch = config["architectures"][0]
         wrong_arch = sorted(name for name, spec in specs.items() if spec.architecture != expected_arch)
         if wrong_arch:
