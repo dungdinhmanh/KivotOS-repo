@@ -65,7 +65,7 @@ jobs:
           script: |
             const apiKey = process.env.AI_API_KEY;
             const apiUrl = process.env.AI_URL || 'https://ollama.com/api/chat';
-            const model = process.env.AI_MODEL || 'devstral-small-2:24b-cloud';
+            const model = process.env.AI_MODEL || 'deepseek-v4-flash';
 
             if (!apiKey) {
               console.log('No AI_API_KEY set, skipping AI triage');

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const model = process.env.AI_MODEL || 'qwen3-coder-32b';
+const model = process.env.AI_MODEL || 'deepseek-v4-flash';
 const apiUrl = process.env.AI_URL || 'https://api.ollama.cloud/v1/chat/completions';
 const apiKey = process.env.AI_API_KEY;
 
