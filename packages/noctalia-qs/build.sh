@@ -13,3 +13,4 @@ cmake -GNinja -B build \
   -DCRASH_HANDLER=OFF
 cmake --build build
 DESTDIR="$stage_dir" cmake --install build
+install -Dm755 "$stage_dir/usr/bin/quickshell" "$stage_dir/usr/bin/qs"
