@@ -82,10 +82,11 @@ jobs:
         if: matrix.depends && matrix.depends.build
         run: |
           apt-get update
-          apt-get install -y ca-certificates curl git jq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            build-essential ca-certificates curl git jq lsb-release
           DEPS=$(echo '${{ toJson(matrix.depends.build) }}' | jq -r '.[]' | tr '\n' ' ')
           if [ -n "$DEPS" ]; then
-            apt-get install -y $DEPS
+            DEBIAN_FRONTEND=noninteractive apt-get install -y $DEPS
           fi
 
       - name: Setup Rust toolchain
