@@ -1,0 +1,71 @@
+name = "noctalia-qs"
+repo = "github:noctalia-dev/noctalia-qs"
+version = "v0.0.12"
+type = "custom"
+toolchain = ""
+build = "bash ../packages/noctalia-qs/build.sh"
+binary = "qs"
+description = "Quickshell fork required by Noctalia v4"
+license = "LGPL-3.0"
+homepage = "https://github.com/noctalia-dev/noctalia-qs"
+
+[depends]
+build = [
+    "ca-certificates",
+    "cmake",
+    "ninja-build",
+    "pkg-config",
+    "qt6-base-dev",
+    "qt6-base-private-dev",
+    "qt6-declarative-dev",
+    "qt6-declarative-private-dev",
+    "qt6-wayland-dev",
+    "qt6-shadertools-dev",
+    "spirv-tools",
+    "libcli11-dev",
+    "libjemalloc-dev",
+    "libwayland-dev",
+    "wayland-protocols",
+    "libgbm-dev",
+    "libvulkan-dev",
+    "libxcb1-dev",
+    "libpipewire-0.3-dev",
+    "libpam0g-dev",
+    "libpolkit-agent-1-dev",
+    "libpolkit-gobject-1-dev",
+    "libupower-glib-dev",
+    "libbluetooth-dev",
+    "libnm-dev"
+]
+runtime = [
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-wayland",
+    "libqt6shadertools6",
+    "libwayland-client0",
+    "libgbm1",
+    "libpipewire-0.3-0",
+    "libpam0g",
+    "polkitd",
+    "upower",
+    "libbluetooth3",
+    "network-manager",
+    "libjemalloc2"
+]
+optional = ["qt6-svg-plugins", "imagemagick"]
+
+[distro]
+codenames = ["trixie"]
+arch = "amd64"
+
+[control]
+maintainer = "Dinh Manh Dung <dungdinhmanh0209@gmail.com>"
+section = "x11"
+priority = "optional"
+homepage = "https://github.com/noctalia-dev/noctalia-qs"
+
+[install]
+"package-root/usr/bin/quickshell" = "/usr/bin/noctalia-qs"
+"package-root/usr/bin/qs" = "/usr/bin/qs"
+"package-root/usr/share/applications/dev.noctalia.noctalia-qs.desktop" = "/usr/share/applications/dev.noctalia.noctalia-qs.desktop"
+"package-root/usr/share/icons/hicolor/scalable/apps/dev.noctalia.noctalia-qs.svg" = "/usr/share/icons/hicolor/scalable/apps/dev.noctalia.noctalia-qs.svg"

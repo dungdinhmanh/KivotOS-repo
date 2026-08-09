@@ -1,0 +1,27 @@
+name = "noctalia-legacy"
+repo = "github:noctalia-dev/noctalia"
+version = "v4.7.7"
+type = "custom"
+build = "bash ../packages/noctalia-legacy/build.sh"
+binary = "qs"
+description = "Noctalia v4 desktop shell configuration for Quickshell"
+license = "MIT"
+homepage = "https://github.com/noctalia-dev/noctalia"
+
+[depends]
+build = ["ca-certificates", "curl", "git"]
+runtime = ["noctalia-qs", "brightnessctl", "imagemagick", "python3", "git"]
+optional = ["cliphist", "wlsunset", "xdg-desktop-portal", "upower", "network-manager", "bluez", "ddcutil", "evolution-data-server"]
+
+[distro]
+codenames = ["trixie"]
+arch = "amd64"
+
+[control]
+maintainer = "Dinh Manh Dung <dungdinhmanh0209@gmail.com>"
+section = "graphics"
+priority = "optional"
+homepage = "https://github.com/noctalia-dev/noctalia"
+
+[install]
+"package-root/usr/share/quickshell/noctalia-legacy" = "/usr/share/quickshell/noctalia-legacy"
