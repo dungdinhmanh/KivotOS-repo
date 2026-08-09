@@ -64,7 +64,8 @@ jobs:
 
   build:
     needs: matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.build_image }}
     timeout-minutes: 30
     if: needs.matrix.outputs.matrix != '{"include":[]}'
     strategy:
@@ -75,28 +76,26 @@ jobs:
       - uses:   actions/checkout@v6.0.2
         with:
           filter: blob:none
+          persist-credentials: false
 
       - name: Install package build dependencies
         if: matrix.depends && matrix.depends.build
         run: |
-          sudo apt-get update
+          apt-get update
+          apt-get install -y ca-certificates curl git jq
           DEPS=$(echo '${{ toJson(matrix.depends.build) }}' | jq -r '.[]' | tr '\n' ' ')
           if [ -n "$DEPS" ]; then
-            sudo apt-get install -y $DEPS
+            apt-get install -y $DEPS
           fi
 
       - name: Setup Rust toolchain
-        if: matrix.type == 'cargo' || matrix.type == 'make' || matrix.toolchain != ''
+        if: matrix.type == 'cargo' || matrix.toolchain != ''
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain || 'stable' }}
 
-      - name: Setup mold linker
-        if: matrix.type == 'cargo'
-        uses: rui314/setup-mold@v1
-
       - name: Cache Rust dependencies
-        if: matrix.type == 'cargo' || matrix.type == 'make'
+        if: matrix.type == 'cargo' || matrix.toolchain != ''
         uses:   Swatinem/rust-cache@v2.9.1
         with:
           prefix-key: "rust-${{ matrix.name }}"
@@ -108,7 +107,7 @@ jobs:
         uses:   actions/cache@v5.0.5
         with:
           path: ${{ join(fromJson(toJson(matrix.cache.paths)), '\n') }}
-          key: ${{ matrix.cache.key }}
+          key: ${{ matrix.build_image }}-${{ runner.arch }}-${{ matrix.cache.key }}-${{ hashFiles(format('packages/{0}/**', matrix.name)) }}
 
       - name: Install cargo-binstall
         if: matrix.type == 'cargo'
@@ -127,14 +126,14 @@ jobs:
         uses:   actions/cache@v5.0.5
         with:
           path: /usr/local/bin/nfpm
-          key: nfpm-${{ env.NFPM_VERSION }}
+          key: nfpm-${{ matrix.build_image }}-${{ env.NFPM_VERSION }}
 
       - name: Install nfpm
         if: matrix.type != 'cargo' && steps.cache-nfpm.outputs.cache-hit != 'true'
         run: |
           curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_amd64.deb" \
             -o /tmp/nfpm.deb
-          sudo dpkg -i /tmp/nfpm.deb
+          dpkg -i /tmp/nfpm.deb
 
       - uses:   actions/setup-python@v6.2.0
         if: matrix.type != 'cargo'

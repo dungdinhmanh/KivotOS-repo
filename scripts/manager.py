@@ -34,8 +34,9 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "pyyaml", "-q"])
     import yaml
 
-LOCK_FILE    = Path("packages.lock")
-PACKAGES_DIR = Path("packages")
+LOCK_FILE       = Path("packages.lock")
+PACKAGES_DIR    = Path("packages")
+REPOSITORY_FILE = Path("repository.toml")
 GITHUB_API   = "https://api.github.com"
 CODEBERG_API = "https://codeberg.org/api/v1"
 REQUEST_TIMEOUT = 10
@@ -48,6 +49,10 @@ def iter_package_tomls() -> list[Path]:
 
 def pkg_name_of(toml_path: Path) -> str:
     return toml_path.parent.name
+
+
+def load_repository() -> dict:
+    return toml.loads(REPOSITORY_FILE.read_text())["repository"]
 
 
 def load_lock() -> dict[str, str]:
@@ -220,6 +225,8 @@ def cmd_update(args) -> None:
 
 def cmd_matrix(args) -> None:
     lock = load_lock()
+    repository = load_repository()
+    build_image = f"debian:{repository['distribution']}-slim"
 
     matrix = []
     for toml_file in iter_package_tomls():
@@ -251,6 +258,7 @@ def cmd_matrix(args) -> None:
             "description": data.get("description", ""),
             "license":     data.get("license", ""),
             "cache":       data.get("cache", None),
+            "build_image": build_image,
         })
 
     if not matrix:

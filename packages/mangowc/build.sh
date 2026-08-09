@@ -1,21 +1,12 @@
 #!/bin/bash
-#
-# Build script for mangowc.
-#
-# Vendored deps (Ubuntu 24.04 ships versions too old for wlroots 0.19):
-#   pixman, wayland, wayland-protocols, libinput, wlroots, scenefx
-#
-# Invoked from CI with cwd = src/ (mangowc source root).
-# Output: src/build/mangowc, src/build/mmsg (picked up by nfpm).
-#
 set -euo pipefail
 
-PIXMAN_VERSION="0.43.4"
-WAYLAND_VERSION="1.23.1"
-WAYLAND_PROTOCOLS_VERSION="1.41"
-LIBINPUT_VERSION="1.27.1"
-WLROOTS_VERSION="0.19.2"
-SCENEFX_VERSION="0.4.1"
+WAYLAND_VERSION="1.24.0"
+WAYLAND_PROTOCOLS_VERSION="1.47"
+LIBDRM_VERSION="2.4.129"
+XKBCOMMON_VERSION="1.8.0"
+WLROOTS_VERSION="0.20.2"
+SCENEFX_VERSION="0.5.0"
 
 SRC_DIR="$(pwd)"
 ROOT_DIR="$(cd .. && pwd)"
@@ -23,14 +14,14 @@ DEPS_DIR="$ROOT_DIR/build/deps"
 LOCAL_PREFIX="$ROOT_DIR/build/local"
 mkdir -p "$DEPS_DIR" "$LOCAL_PREFIX"
 
-export PKG_CONFIG_PATH="$LOCAL_PREFIX/lib/pkgconfig:$LOCAL_PREFIX/lib/x86_64-linux-gnu/pkgconfig:${PKG_CONFIG_PATH:-}"
-export LD_LIBRARY_PATH="$LOCAL_PREFIX/lib:$LOCAL_PREFIX/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+export PATH="$LOCAL_PREFIX/bin:$PATH"
+export PKG_CONFIG_PATH="$LOCAL_PREFIX/share/pkgconfig:$LOCAL_PREFIX/lib/pkgconfig:$LOCAL_PREFIX/lib/x86_64-linux-gnu/pkgconfig:${PKG_CONFIG_PATH:-}"
 
 echo "=== Pinned dependency versions ==="
-echo "  pixman:            $PIXMAN_VERSION"
 echo "  wayland:           $WAYLAND_VERSION"
 echo "  wayland-protocols: $WAYLAND_PROTOCOLS_VERSION"
-echo "  libinput:          $LIBINPUT_VERSION"
+echo "  libdrm:            $LIBDRM_VERSION"
+echo "  xkbcommon:         $XKBCOMMON_VERSION"
 echo "  wlroots:           $WLROOTS_VERSION"
 echo "  scenefx:           $SCENEFX_VERSION"
 echo "  prefix:   $LOCAL_PREFIX"
@@ -45,28 +36,34 @@ build_dep() {
   echo "=== $name $version ==="
   cd "$DEPS_DIR"
 
-  if [ ! -d "$name" ]; then
-    git clone --depth=1 -b "$tag" "$url" "$name"
-  else
-    echo "  (cached: skipping clone)"
+  if [ ! -d "$name/.git" ]; then
+    rm -rf "$name"
+    git clone --filter=blob:none --no-checkout "$url" "$name"
   fi
   cd "$name"
+  git remote set-url origin "$url"
+  git fetch --depth=1 origin "refs/tags/$tag"
+  git checkout --detach --force FETCH_HEAD
+  git clean -ffdx
 
-  local stamp="$LOCAL_PREFIX/.${name}-${version}.stamp"
+  local commit stamp
+  commit="$(git rev-parse HEAD)"
+  stamp="$LOCAL_PREFIX/.${name}-${version}-${commit}.stamp"
   if [ -f "$stamp" ]; then
     echo "  (stamp present: skipping rebuild)"
     return 0
   fi
 
   rm -rf build
-  meson setup build --prefix="$LOCAL_PREFIX" --buildtype=release "${meson_args[@]}"
+  meson setup build \
+    --prefix="$LOCAL_PREFIX" \
+    --buildtype=release \
+    -Ddefault_library=static \
+    "${meson_args[@]}"
   ninja -C build
   ninja -C build install
   touch "$stamp"
 }
-
-build_dep pixman "$PIXMAN_VERSION" \
-  "https://gitlab.freedesktop.org/pixman/pixman.git" "pixman-$PIXMAN_VERSION"
 
 build_dep wayland "$WAYLAND_VERSION" \
   "https://gitlab.freedesktop.org/wayland/wayland.git" "$WAYLAND_VERSION" \
@@ -75,16 +72,22 @@ build_dep wayland "$WAYLAND_VERSION" \
 build_dep wayland-protocols "$WAYLAND_PROTOCOLS_VERSION" \
   "https://gitlab.freedesktop.org/wayland/wayland-protocols.git" "$WAYLAND_PROTOCOLS_VERSION"
 
-build_dep libinput "$LIBINPUT_VERSION" \
-  "https://gitlab.freedesktop.org/libinput/libinput.git" "$LIBINPUT_VERSION" \
-  -Ddebug-gui=false -Dtests=false -Dlibwacom=false -Ddocumentation=false
+build_dep libdrm "$LIBDRM_VERSION" \
+  "https://gitlab.freedesktop.org/mesa/drm.git" "libdrm-$LIBDRM_VERSION" \
+  -Dauto_features=disabled -Dtests=false
+
+build_dep xkbcommon "$XKBCOMMON_VERSION" \
+  "https://github.com/xkbcommon/libxkbcommon.git" "xkbcommon-$XKBCOMMON_VERSION" \
+  -Denable-tools=false -Denable-x11=false -Denable-docs=false \
+  -Denable-wayland=false -Denable-xkbregistry=false -Denable-bash-completion=false
 
 build_dep wlroots "$WLROOTS_VERSION" \
   "https://gitlab.freedesktop.org/wlroots/wlroots.git" "$WLROOTS_VERSION" \
   -Dbackends=drm,libinput -Drenderers=gles2 -Dexamples=false -Dxwayland=enabled
 
 build_dep scenefx "$SCENEFX_VERSION" \
-  "https://github.com/wlrfx/scenefx.git" "$SCENEFX_VERSION"
+  "https://github.com/wlrfx/scenefx.git" "0.5" \
+  -Dexamples=false
 
 echo ""
 echo "=== Building mangowc ==="
@@ -94,6 +97,10 @@ rm -rf build
 meson setup build --prefix=/usr --buildtype=release
 ninja -C build
 
-echo ""
-echo "Build complete:"
+ldd_output="$(ldd build/mango)"
+printf '%s\n' "$ldd_output"
+if printf '%s\n' "$ldd_output" | grep -qE 'not found|build/local'; then
+  exit 1
+fi
+
 ls -lh build/mango build/mmsg

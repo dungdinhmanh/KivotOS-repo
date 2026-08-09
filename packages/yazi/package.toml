@@ -2,6 +2,7 @@ name = "yazi"
 repo = "github:sxyazi/yazi"
 version = "latest"
 type = "custom"
+toolchain = "stable"
 build = "cargo build --workspace --release"
 binary = "yazi"
 description = "Blazing fast terminal file manager"
@@ -9,7 +10,7 @@ license = "MIT"
 homepage = "https://github.com/sxyazi/yazi"
 
 [depends]
-build = ["rustc", "cargo", "git", "pkg-config", "libssl-dev", "gcc", "cmake"]
+build = ["git", "pkg-config", "libssl-dev", "gcc", "cmake"]
 runtime = []
 optional = ["ffmpeg", "p7zip", "jq", "poppler-utils", "fd-find", "ripgrep", "fzf", "zoxide", "imagemagick"]
 

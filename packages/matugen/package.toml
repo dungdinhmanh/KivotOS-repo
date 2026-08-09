@@ -8,7 +8,7 @@ license = "GPL-2.0"
 homepage = "https://github.com/InioX/matugen"
 
 [depends]
-build = ["rustc", "cargo", "git", "pkg-config"]
+build = ["git", "pkg-config"]
 runtime = []
 
 [distro]
