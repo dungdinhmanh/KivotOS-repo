@@ -41,6 +41,7 @@ build = [
     "libudev-dev",
     "libmtdev-dev",
     "libevdev-dev",
+    "libinput-dev",
     "libcjson-dev",
     "libpango1.0-dev"
 ]
