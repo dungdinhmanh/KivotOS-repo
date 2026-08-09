@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+PIXMAN_VERSION="0.46.0"
 WAYLAND_VERSION="1.24.0"
 WAYLAND_PROTOCOLS_VERSION="1.47"
 LIBDRM_VERSION="2.4.129"
@@ -18,6 +19,7 @@ export PATH="$LOCAL_PREFIX/bin:$PATH"
 export PKG_CONFIG_PATH="$LOCAL_PREFIX/share/pkgconfig:$LOCAL_PREFIX/lib/pkgconfig:$LOCAL_PREFIX/lib/x86_64-linux-gnu/pkgconfig:${PKG_CONFIG_PATH:-}"
 
 echo "=== Pinned dependency versions ==="
+echo "  pixman:            $PIXMAN_VERSION"
 echo "  wayland:           $WAYLAND_VERSION"
 echo "  wayland-protocols: $WAYLAND_PROTOCOLS_VERSION"
 echo "  libdrm:            $LIBDRM_VERSION"
@@ -64,6 +66,9 @@ build_dep() {
   ninja -C build install
   touch "$stamp"
 }
+
+build_dep pixman "$PIXMAN_VERSION" \
+  "https://gitlab.freedesktop.org/pixman/pixman.git" "pixman-$PIXMAN_VERSION"
 
 build_dep wayland "$WAYLAND_VERSION" \
   "https://gitlab.freedesktop.org/wayland/wayland.git" "$WAYLAND_VERSION" \

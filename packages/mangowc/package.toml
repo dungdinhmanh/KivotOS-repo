@@ -1,12 +1,12 @@
 name = "mangowc"
-repo = "github:DreamMaoMao/mangowc"
+repo = "github:mangowm/mango"
 version = "latest"
 type = "custom"
 build = "bash ../packages/mangowc/build.sh"
 binary = "mangowc"
 description = "A Wayland compositor based on wlroots and scenefx (dwm but wayland)"
 license = "MIT"
-homepage = "https://github.com/DreamMaoMao/mangowc"
+homepage = "https://github.com/mangowm/mango"
 
 [depends]
 build = [
@@ -65,7 +65,7 @@ arch = "amd64"
 maintainer = "Dinh Manh Dung <dungdinhmanh0209@gmail.com>"
 section = "x11"
 priority = "optional"
-homepage = "https://github.com/DreamMaoMao/mangowc"
+homepage = "https://github.com/mangowm/mango"
 
 [install]
 "build/mango" = "/usr/bin/mangowc"

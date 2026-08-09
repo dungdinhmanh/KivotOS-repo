@@ -8,31 +8,15 @@ Commands:
     nfpm-config - Generate nfpm.yaml for a single package (used by CI)
 """
 
-import os
-import json
 import argparse
-import sys
-import subprocess
 import concurrent.futures
+import json
+import os
+import sys
 from pathlib import Path
 
-try:
-    import toml
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "toml", "-q"])
-    import toml
-
-try:
-    import requests
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests", "-q"])
-    import requests
-
-try:
-    import yaml
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyyaml", "-q"])
-    import yaml
+import toml
+import yaml
 
 LOCK_FILE       = Path("packages.lock")
 PACKAGES_DIR    = Path("packages")
@@ -75,6 +59,8 @@ def save_lock(lock: dict[str, str]) -> None:
 
 def get_latest_version(repo: str) -> str | None:
     """Resolve "github:owner/repo" or "codeberg:owner/repo" to its latest tag."""
+    import requests
+
     if ":" not in repo:
         return None
 
@@ -103,7 +89,7 @@ def get_latest_version(repo: str) -> str | None:
         print(f"  ⏱ Timeout: {repo}", file=sys.stderr)
     except requests.exceptions.HTTPError as e:
         print(f"  ❌ HTTP {e.response.status_code}: {repo}", file=sys.stderr)
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         print(f"  ❌ Error fetching {repo}: {e}", file=sys.stderr)
 
     return None
@@ -185,7 +171,7 @@ def cmd_update(args) -> None:
     for toml_file in all_toml:
         try:
             data = toml.loads(toml_file.read_text())
-        except Exception as e:
+        except toml.TomlDecodeError as e:
             print(f"⚠ Error parsing {toml_file}: {e}", file=sys.stderr)
             continue
         repo = data.get("repo")
@@ -234,7 +220,7 @@ def cmd_matrix(args) -> None:
 
         try:
             data = toml.loads(toml_file.read_text())
-        except Exception as e:
+        except toml.TomlDecodeError as e:
             print(f"⚠ Error parsing {toml_file}: {e}", file=sys.stderr)
             continue
 

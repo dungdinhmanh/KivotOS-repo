@@ -67,6 +67,9 @@ jobs:
     runs-on: ubuntu-24.04
     container: ${{ matrix.build_image }}
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
     if: needs.matrix.outputs.matrix != '{"include":[]}'
     strategy:
       fail-fast: false
@@ -89,6 +92,12 @@ jobs:
           if [ -n "$DEPS" ]; then
             DEBIAN_FRONTEND=noninteractive apt-get install -y $DEPS
           fi
+
+      - name: Prepare source
+        env:
+          REPOSITORY: ${{ matrix.repo }}
+          SOURCE_REF: ${{ matrix.version }}
+        run: scripts/clone_source.sh
 
       - name: Setup Rust toolchain
         if: matrix.type == 'cargo' || matrix.toolchain != ''
@@ -146,39 +155,15 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           mkdir -p dist
 
-          REPO_URL="${{ matrix.repo }}"
-          case "$REPO_URL" in
-            github:*)   REPO_URL="https://github.com/${REPO_URL#github:}"   ;;
-            codeberg:*) REPO_URL="https://codeberg.org/${REPO_URL#codeberg:}" ;;
-          esac
-
-          clone_repo() {
-            local url="$1" ver="$2"
-            rm -rf src
-            if [[ "$ver" == "latest" ]]; then
-              git clone --depth=1 "$url" src
-            else
-              git clone --depth=1 --branch "$ver" "$url" src 2>/dev/null || {
-                git clone --depth=1 "$url" src
-                cd src
-                git fetch --depth=1 origin "$ver"
-                git checkout "$ver"
-                cd ..
-              }
-            fi
-          }
-
           case "${{ matrix.type }}" in
 
             cargo)
-              clone_repo "$REPO_URL" "${{ matrix.version }}"
               cd src
               cargo deb
               cd ..
               ;;
 
             make)
-              clone_repo "$REPO_URL" "${{ matrix.version }}"
               cd src
               source "$HOME/.cargo/env" 2>/dev/null || true
               export PATH="$HOME/.cargo/bin:$PATH"
@@ -187,7 +172,6 @@ jobs:
               ;;
 
             custom)
-              clone_repo "$REPO_URL" "${{ matrix.version }}"
               cd src
               ${{ matrix.build_cmd }}
               [[ -n "$POST_BUILD" ]] && eval "$POST_BUILD"
@@ -195,7 +179,6 @@ jobs:
               ;;
 
             ninja)
-              clone_repo "$REPO_URL" "${{ matrix.version }}"
               cd src
               meson setup build --prefix=/usr --buildtype=release
               ninja -C build
