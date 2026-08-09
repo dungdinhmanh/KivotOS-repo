@@ -83,7 +83,8 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            build-essential ca-certificates curl git jq lsb-release
+            build-essential ca-certificates curl git jq \
+            python3 python3-toml python3-yaml
           DEPS=$(echo '${{ toJson(matrix.depends.build) }}' | jq -r '.[]' | tr '\n' ' ')
           if [ -n "$DEPS" ]; then
             DEBIAN_FRONTEND=noninteractive apt-get install -y $DEPS
@@ -136,15 +137,6 @@ jobs:
             -o /tmp/nfpm.deb
           dpkg -i /tmp/nfpm.deb
 
-      - uses:   actions/setup-python@v6.2.0
-        if: matrix.type != 'cargo'
-        with:
-          python-version: "3.x"
-          cache: "pip"
-
-      - name: Install Python deps
-        if: matrix.type != 'cargo'
-        run: pip install toml pyyaml
 
       - name: Build ${{ matrix.name }}
         env:
@@ -226,7 +218,7 @@ jobs:
       - name: Generate nfpm config & package
         if: matrix.type != 'cargo'
         run: |
-          python scripts/manager.py nfpm-config \
+          python3 scripts/manager.py nfpm-config \
             --package "${{ matrix.name }}" \
             --src-dir src \
             --output /tmp/nfpm.yaml
